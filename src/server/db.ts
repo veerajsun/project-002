@@ -36,7 +36,7 @@ export function getPool(): Pool {
 
 /** Run one query. Always pass values as parameters ($1, $2...), never inside the SQL text. */
 export async function query<R = any>(text: string, params?: unknown[]) {
-  return getPool().query<R>(text, params);
+return getPool().query(text, params) as unknown as Promise<{ rows: R[]; rowCount: number | null }>;
 }
 
 /** All-or-nothing: everything inside `fn` is saved together, or not at all. */
