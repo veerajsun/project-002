@@ -20,7 +20,7 @@ export const products: Product[] = [
     slug: "khalta-500g",
     name: "Khalta Yamani Honey 0.5 kg | For Man Power | khalta Honey ( Direct )",
     grams: 500,
-    price: 2499,
+    price: 2099,
     mrp: 2999,
     images: [
       "/images/products/khalta-500g-1.jpg",
@@ -37,8 +37,8 @@ export const products: Product[] = [
     slug: "khalta-1kg",
     name: "Khalta Yamani Honey 1 kg | For Man Power | khalta yamini Honey ( Direct )",
     grams: 1000,
-    price: 4499,
-    mrp: 5999,
+    price: 3199,
+    mrp: 5099,
     images: [
       "/images/products/khalta-1kg-1.png",
       "/images/products/khalta-1kg-2.jpg",
@@ -53,7 +53,7 @@ export const products: Product[] = [
     slug: "khalta-250g-course",
     name: "Khalta Yamani Honey 250 g | For Man Power | khalta yamini Honey (Course )",
     grams: 250,
-    price: 1499,
+    price: 1299,
     mrp: 1999,
     images: [
       "/images/products/khalta-250g-course-1.jpg",
@@ -69,7 +69,7 @@ export const products: Product[] = [
     // brand renamed Sabaland -> Sabland (display name)
     name: "Sabland Yamani Honey Khalta Direct 250gram | For Man Power | Khalta Honey ( Direct )",
     grams: 250,
-    price: 1499,
+    price: 1299,
     mrp: 1999,
     images: [
       "/images/products/khalta-250g-direct-1.jpg",
