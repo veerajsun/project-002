@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "better-sqlite3": "^13.0.3",
     "material-symbols": "latest",
     "next": "^15.5.0",
     "pg": "^8.23.1",
@@ -15,6 +16,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^20",
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
@@ -23,5 +25,8 @@
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "typescript": "^5"
+  },
+  "allowScripts": {
+    "better-sqlite3@13.0.3": true
   }
 }

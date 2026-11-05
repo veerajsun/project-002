@@ -57,8 +57,15 @@ export function checkOrigin(request: Request): Response | null {
 
 function isDatabaseDown(code: unknown): boolean {
   if (typeof code !== "string") return false;
-  if (["ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT", "ECONNRESET", "EAI_AGAIN"].includes(code)) return true;
-  return /^(08|28|3D|53|57)/.test(code); // connection / login / missing database / server busy
+
+  return [
+    "SQLITE_BUSY",
+    "SQLITE_LOCKED",
+    "SQLITE_CANTOPEN",
+    "SQLITE_IOERR",
+    "SQLITE_NOTADB",
+    "SQLITE_CORRUPT",
+  ].some((prefix) => code.startsWith(prefix));
 }
 
 /**
@@ -76,9 +83,12 @@ export function withErrorHandling(label: string, handler: (request: Request) => 
       if (err instanceof ConfigError) {
         return apiError(503, "SERVER_NOT_CONFIGURED", "The server is not configured yet.");
       }
-      if (code === "42P01") {
-        return apiError(503, "DATABASE_NOT_READY", "The database has not been set up yet.");
-      }
+      if (
+  code.startsWith("SQLITE_ERROR") &&
+  /no such table/i.test(String(e?.message ?? ""))
+) {
+  return apiError(503, "DATABASE_NOT_READY", "The database has not been set up yet.");
+}
       if (isDatabaseDown(code)) {
         return apiError(503, "DATABASE_UNAVAILABLE", "The database is not reachable right now.");
       }

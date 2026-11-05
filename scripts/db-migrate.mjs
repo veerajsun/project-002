@@ -1,65 +1,86 @@
-// Creates / updates the database tables from the .sql files in db/migrations.
-//   node scripts\db-migrate.mjs
-// Safe to run again: a file that was already applied is skipped. Each file runs inside ONE
-// transaction, so a failure leaves the database exactly as it was.
-import crypto from "node:crypto";
+
 import fs from "node:fs";
 import path from "node:path";
-import { connect, describeTarget, loadEnv, root } from "./_db-utils.mjs";
+import crypto from "node:crypto";
+import { connect, describeTarget, root } from "./_db-utils.mjs";
 
 async function main() {
-  await loadEnv();
-  const dir = path.join(root, "db", "migrations");
-  const files = fs.readdirSync(dir).filter((f) => /^\d+_.+\.sql$/.test(f)).sort();
-  const client = await connect();
-  console.log("Database:", describeTarget());
-  let failed = false;
+  const db = await connect();
+
   try {
-    await client.query(
-      `CREATE TABLE IF NOT EXISTS schema_migrations (
-         name text PRIMARY KEY,
-         checksum text NOT NULL,
-         applied_at timestamptz NOT NULL DEFAULT now()
-       )`
-    );
-    const done = new Map(
-      (await client.query("SELECT name, checksum FROM schema_migrations")).rows.map((r) => [r.name, r.checksum])
-    );
-    let applied = 0;
-    for (const file of files) {
-      const sql = fs.readFileSync(path.join(dir, file), "utf8");
-      const checksum = crypto.createHash("sha256").update(sql).digest("hex");
-      if (done.has(file)) {
-        if (done.get(file) !== checksum) {
-          console.error(`STOP: ${file} was changed after it was applied. Never edit an applied file: add a NEW migration instead.`);
-          failed = true;
-          break;
+    console.log(`[migration] Target: ${describeTarget()}`);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        filename TEXT PRIMARY KEY,
+        checksum TEXT NOT NULL,
+        applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    const migrationDir = path.join(root, "db", "migrations");
+
+    if (!fs.existsSync(migrationDir)) {
+      throw new Error(`Migration directory not found: ${migrationDir}`);
+    }
+
+    const files = fs
+      .readdirSync(migrationDir)
+      .filter((file) => /^\d+.*\.sql$/i.test(file))
+      .sort();
+
+    if (files.length === 0) {
+      console.log("[migration] No migration files found.");
+      return;
+    }
+
+    for (const filename of files) {
+      const fullPath = path.join(migrationDir, filename);
+      const sql = fs.readFileSync(fullPath, "utf8");
+
+      const checksum = crypto
+        .createHash("sha256")
+        .update(sql)
+        .digest("hex");
+
+      const existing = db
+        .prepare(
+          "SELECT checksum FROM schema_migrations WHERE filename = ?"
+        )
+        .get(filename);
+
+      if (existing) {
+        if (existing.checksum !== checksum) {
+          throw new Error(
+            `Migration checksum mismatch: ${filename}. Do not edit an already-applied migration.`
+          );
         }
-        console.log(`  already applied: ${file}`);
+
+        console.log(`[migration] Already applied: ${filename}`);
         continue;
       }
-      console.log(`  applying: ${file}`);
-      await client.query("BEGIN");
-      try {
-        await client.query(sql);
-        await client.query("INSERT INTO schema_migrations (name, checksum) VALUES ($1, $2)", [file, checksum]);
-        await client.query("COMMIT");
-        applied++;
-      } catch (err) {
-        await client.query("ROLLBACK");
-        console.error(`  FAILED: ${file}\n  ${err.message}${err.position ? ` (at character ${err.position})` : ""}`);
-        console.error("  Nothing was changed. Send me this message and I will fix the SQL.");
-        failed = true;
-        break;
-      }
+
+      const applyMigration = db.transaction(() => {
+        db.exec(sql);
+
+        db.prepare(`
+          INSERT INTO schema_migrations (filename, checksum)
+          VALUES (?, ?)
+        `).run(filename, checksum);
+      });
+
+      applyMigration();
+
+      console.log(`[migration] Applied: ${filename}`);
     }
-    if (!failed) console.log(applied ? `Done: ${applied} migration(s) applied.` : "Nothing to do: the database is up to date.");
+
+    console.log("[migration] All migrations completed.");
   } finally {
-    await client.end();
+    db.close();
   }
-  process.exit(failed ? 1 : 0);
 }
-main().catch((err) => {
-  console.error("Unexpected error:", err && err.message ? err.message : err);
-  process.exit(1);
+
+main().catch((error) => {
+  console.error("[migration] Failed:", error.message);
+  process.exitCode = 1;
 });

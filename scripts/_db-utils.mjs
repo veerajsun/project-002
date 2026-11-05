@@ -1,85 +1,162 @@
-// Small helpers shared by the db-*.mjs scripts. Not used by the website itself.
+
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+export const root = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  ".."
+);
 
-/** Loads .env.local / .env exactly like Next.js does (the package ships with Next.js). */
 export async function loadEnv() {
   try {
     const mod = await import("@next/env");
     const loadEnvConfig = (mod.default ?? mod).loadEnvConfig;
     loadEnvConfig(root, process.env.NODE_ENV !== "production");
-    return;
   } catch {
-    // fall back to a tiny reader below
-  }
-  for (const name of [".env.local", ".env"]) {
-    const file = path.join(root, name);
-    if (!fs.existsSync(file)) continue;
-    for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
-      const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
-      if (!m || line.trim().startsWith("#")) continue;
-      const value = m[2].replace(/^(["'])(.*)\1$/, "$2");
-      if (process.env[m[1]] === undefined) process.env[m[1]] = value;
+    for (const file of [".env.local", ".env"]) {
+      const fullPath = path.join(root, file);
+      if (!fs.existsSync(fullPath)) continue;
+
+      const content = fs.readFileSync(fullPath, "utf8");
+
+      for (const line of content.split(/\r?\n/)) {
+        const match = line.match(
+          /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/
+        );
+
+        if (!match || process.env[match[1]] !== undefined) continue;
+
+        let value = match[2].trim();
+
+        if (
+          (value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))
+        ) {
+          value = value.slice(1, -1);
+        }
+
+        process.env[match[1]] = value;
+      }
     }
   }
 }
 
-/** host:port/database only. The password is never printed. */
-export function describeTarget() {
-  try {
-    const u = new URL(process.env.DATABASE_URL);
-    return `${u.hostname}${u.port ? ":" + u.port : ""}/${u.pathname.replace(/^\//, "")}`;
-  } catch {
-    return "(DATABASE_URL could not be read)";
+export function getSqliteDbPath() {
+  const configured = process.env.SQLITE_DB_PATH;
+
+  if (!configured?.trim()) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("SQLITE_DB_PATH is not configured.");
+    }
+
+    return path.join(root, "data", "sabaland.db");
   }
+
+  return configured.trim();
+}
+
+export function describeTarget() {
+  const dbPath = getSqliteDbPath();
+
+  if (dbPath === ":memory:") return "SQLite in-memory database";
+
+  return `SQLite database: ${path.basename(dbPath)}`;
 }
 
 export async function connect() {
-  if (!process.env.DATABASE_URL) {
-    console.error("DATABASE_URL is not set. Copy .env.example to .env.local and fill it in.");
-    process.exit(1);
+  await loadEnv();
+
+  const Database = (await import("better-sqlite3")).default;
+  const configuredPath = getSqliteDbPath();
+
+  const dbPath =
+    configuredPath === ":memory:"
+      ? configuredPath
+      : path.resolve(root, configuredPath);
+
+  if (dbPath !== ":memory:") {
+    fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   }
-  let pg;
-  try {
-    pg = (await import("pg")).default;
-  } catch {
-    console.error('The "pg" package is not installed. Run:  npm.cmd install pg@8');
-    process.exit(1);
-  }
-  const client = new pg.Client({
-    connectionString: process.env.DATABASE_URL,
-    connectionTimeoutMillis: 10_000,
-  });
-  try {
-    await client.connect();
-  } catch (err) {
-    console.error(`Could not connect to the database (${err.code || err.name}).`);
-    console.error("Check DATABASE_URL in .env.local, and that PostgreSQL is running.");
-    process.exit(1);
-  }
-  return client;
+
+  const db = new Database(dbPath);
+
+  db.pragma("foreign_keys = ON");
+  db.pragma("busy_timeout = 5000");
+  db.pragma("journal_mode = WAL");
+  db.pragma("synchronous = NORMAL");
+
+  return db;
 }
 
 /**
- * Converts some TypeScript files from src/ into plain JavaScript inside node_modules/.cache,
- * so the scripts can run the REAL project code (using the project's own `typescript`).
+ * Transpiles TypeScript files into a temporary ESM folder
+ * so Node scripts can import the actual application code.
  */
-export async function transpile(files, folderName) {
-  const ts = (await import("typescript")).default;
-  const outDir = path.join(root, "node_modules", ".cache", folderName);
-  fs.mkdirSync(outDir, { recursive: true });
-  for (const rel of files) {
-    const source = fs.readFileSync(path.join(root, rel), "utf8");
-    let js = ts.transpileModule(source, {
-      compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
-    }).outputText;
-    js = js.replace(/from\s+(["'])\.\/([\w-]+)\1/g, 'from "./$2.mjs"');
-    // plain Node cannot always read a named export from the CommonJS "pg" package; Next.js can.
-    js = js.replace(/import\s*\{\s*Pool\s*\}\s*from\s*["']pg["'];?/, 'import pg from "pg"; const { Pool } = pg;');
-    fs.writeFileSync(path.join(outDir, path.basename(rel).replace(/\.ts$/, ".mjs")), js);
+export async function transpile(files, folderName = "db-tools") {
+  const ts = await import("typescript");
+
+  const outputDir = path.join(
+    root,
+    "node_modules",
+    ".cache",
+    folderName
+  );
+
+  fs.mkdirSync(outputDir, { recursive: true });
+
+  const compilerOptions = {
+    target: ts.default.ScriptTarget.ES2022,
+    module: ts.default.ModuleKind.ES2022,
+    moduleResolution: ts.default.ModuleResolutionKind.Bundler,
+    esModuleInterop: true,
+    skipLibCheck: true,
+  };
+
+  const written = [];
+
+  for (const relativeFile of files) {
+    const absoluteFile = path.join(root, relativeFile);
+    const source = fs.readFileSync(absoluteFile, "utf8");
+
+    const result = ts.default.transpileModule(source, {
+      compilerOptions,
+      fileName: absoluteFile,
+      reportDiagnostics: true,
+    });
+
+    const errors = (result.diagnostics ?? []).filter(
+      (diagnostic) =>
+        diagnostic.category === ts.default.DiagnosticCategory.Error
+    );
+
+    if (errors.length) {
+      throw new Error(
+        errors
+          .map((diagnostic) =>
+            ts.default.flattenDiagnosticMessageText(
+              diagnostic.messageText,
+              "\n"
+            )
+          )
+          .join("\n")
+      );
+    }
+
+    const outputName =
+      path.basename(relativeFile).replace(/\.tsx?$/, ".mjs");
+
+    const outputPath = path.join(outputDir, outputName);
+
+    const code = result.outputText.replace(
+      /(\bfrom\s+["'])(\.{1,2}\/[^"']+)(["'])/g,
+      (_match, before, specifier, after) =>
+        `${before}${specifier.replace(/\.tsx?$/, ".mjs")}${after}`
+    );
+
+    fs.writeFileSync(outputPath, code, "utf8");
+    written.push(outputPath);
   }
-  return outDir;
+
+  return outputDir;
 }

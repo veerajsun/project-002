@@ -7,5 +7,5 @@ export const dynamic = "force-dynamic";
 // Shows whether the database can be reached. Reveals nothing else.
 export const GET = withErrorHandling("health", async () => {
   await query("SELECT 1");
-  return json({ ok: true, database: "up", orders: "disabled_until_phone_verification" });
+  return json({ ok: true, database: "up" });
 });

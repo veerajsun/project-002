@@ -7,16 +7,12 @@ import { useCart } from "@/lib/cart";
 import { getProduct, shortName } from "@/data/products";
 import { formatINR } from "@/lib/format";
 import {
-  CHECKOUT_PREVIEW_ALLOWED,
   EMPTY_DRAFT,
   clearDraft,
-  effectiveStep,
-  isFlowOpen,
   loadDraft,
   saveDraft,
   validateAddress,
   validateMobile,
-  type Access,
   type Address,
   type CheckoutRow,
   type Draft,
@@ -96,14 +92,10 @@ function SummaryBody({ rows, totals }: { rows: CheckoutRow[]; totals: Totals }) 
   );
 }
 
-// Who may see Steps 2 and 3?  (type Access, see src/lib/checkout.ts)
-//   "none"     - nobody (the default on every load, and after every refresh)
-//   "verified" - ONLY set when the phone-verification service returns a successful result
-//   "preview"  - design preview (development only): NOT verified, can never place an order
-// This lives in memory only. It is never saved to storage and is never read from storage.
+
 export default function CheckoutFlow() {
   const { lines } = useCart();
-  const [access, setAccess] = useState<Access>("none");
+
 
   // Cart + saved details live in the browser: wait for the page to load first.
   const [loaded, setLoaded] = useState(false);
@@ -149,14 +141,8 @@ export default function CheckoutFlow() {
 
   // Steps 2 and 3 need a verified phone (or the development-only preview), plus valid details.
   const mobileOk = validateMobile(draft.mobile) === null;
-  const addressOk = Object.keys(validateAddress(draft.address)).length === 0;
-  const flowOpen = isFlowOpen(access, CHECKOUT_PREVIEW_ALLOWED);
-  const step = effectiveStep(draft.step, {
-    access,
-    previewAllowed: CHECKOUT_PREVIEW_ALLOWED,
-    mobileOk,
-    addressOk,
-  });
+const addressOk = Object.keys(validateAddress(draft.address)).length === 0;
+const step = draft.step;
 
   useEffect(() => {
     if (firstRun.current) {
@@ -170,23 +156,9 @@ export default function CheckoutFlow() {
   const goTo = (next: 1 | 2 | 3) => setDraft((d) => ({ ...d, step: next }));
   const setAddress = (address: Address) => setDraft((d) => ({ ...d, address }));
   const resetAll = () => {
-    clearDraft();
-    setDraft(EMPTY_DRAFT);
-    setAccess("none");
-  };
-  const openFlow = (mobile: string, mode: "verified" | "preview") => {
-    setAccess(mode);
-    setDraft((d) => ({
-      ...d,
-      mobile,
-      step: 2,
-      address: { ...d.address, mobile: d.address.mobile || mobile },
-    }));
-  };
-  const exitPreview = () => {
-    setAccess("none");
-    setDraft((d) => ({ ...d, step: 1 }));
-  };
+  clearDraft();
+  setDraft(EMPTY_DRAFT);
+};
 
   if (!loaded) {
     return (
@@ -254,27 +226,8 @@ export default function CheckoutFlow() {
         </div>
       </details>
 
-      <div className="mt-8 grid grid-cols-1 items-start gap-8 lg:grid-cols-12">
-        <section className="flex min-w-0 flex-col gap-6 lg:col-span-7">
-          {access === "preview" && flowOpen && (
-            <div
-              role="alert"
-              className="flex flex-col gap-3 rounded-xl border-2 border-dashed border-amber-400 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <p className="text-sm leading-relaxed text-charcoal-900">
-                <strong>PREVIEW MODE.</strong> Your phone number is{" "}
-                <strong>NOT verified</strong>. This is a design preview only: no order can be
-                placed and nothing is saved or sent.
-              </p>
-              <button
-                type="button"
-                onClick={exitPreview}
-                className="shrink-0 rounded-lg border border-amber-700 bg-white px-4 py-2 text-xs font-bold uppercase tracking-wider text-amber-900 transition-colors hover:bg-amber-100"
-              >
-                Exit preview
-              </button>
-            </div>
-          )}
+      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-12">
+  <section className="lg:col-span-7">
 
           {/* Stepper */}
           <ol className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5" aria-label="Checkout steps">
@@ -329,38 +282,44 @@ export default function CheckoutFlow() {
           </ol>
 
           {/* Active step */}
-          <div ref={panelRef} tabIndex={-1} className="outline-none">
-            {step === 1 && (
-              <StepContact
-                initialMobile={draft.mobile}
-                previewAllowed={CHECKOUT_PREVIEW_ALLOWED}
-                onVerified={(mobile) => openFlow(mobile, "verified")}
-                onEnterPreview={(mobile) => {
-                  if (CHECKOUT_PREVIEW_ALLOWED) openFlow(mobile, "preview");
-                }}
-              />
-            )}
-            {step === 2 && (
-              <StepAddress
-                address={draft.address}
-                onChange={setAddress}
-                onBack={() => goTo(1)}
-                onContinue={() => goTo(3)}
-              />
-            )}
+<div ref={panelRef} tabIndex={-1} className="outline-none">
+  {step === 1 && (
+    <StepContact
+      initialMobile={draft.mobile}
+      onContinue={(mobile: string) => {
+        setDraft((current) => ({
+          ...current,
+          mobile,
+          address: {
+            ...current.address,
+            mobile,
+          },
+        }));
+        goTo(2);
+      }}
+    />
+  )}
+
+  {step === 2 && (
+    <StepAddress
+      address={draft.address}
+      onChange={setAddress}
+      onBack={() => goTo(1)}
+      onContinue={() => goTo(3)}
+    />
+  )}
             {step === 3 && (
               <StepReview
                 rows={rows}
                 totals={totals}
-                mode={access === "verified" ? "verified" : "preview"}
-                mobile={draft.mobile}
                 address={draft.address}
-                onEdit={goTo}
+                onEdit={() => goTo(2)}
                 onClearDetails={resetAll}
               />
             )}
           </div>
-        </section>
+
+          </section>
 
         {/* Desktop order summary */}
         <aside className="hidden lg:col-span-5 lg:block">
@@ -376,7 +335,7 @@ export default function CheckoutFlow() {
             </div>
             <SummaryBody rows={rows} totals={totals} />
           </div>
-        </aside>
+                </aside>
       </div>
     </div>
   );

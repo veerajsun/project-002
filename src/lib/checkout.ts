@@ -50,25 +50,6 @@ export const CHECKOUT_PREVIEW_ALLOWED: boolean =
   process.env.NODE_ENV !== "production" ||
   process.env.NEXT_PUBLIC_CHECKOUT_PREVIEW === "true";
 
-/** Who may see Steps 2 and 3. Lives in memory only; it is never saved to or read from storage. */
-export type Access = "none" | "preview" | "verified";
-
-/** Steps 2 and 3 exist only after a server-confirmed phone check, or in the development-only preview. */
-export function isFlowOpen(access: Access, previewAllowed: boolean): boolean {
-  return access === "verified" || (access === "preview" && previewAllowed);
-}
-
-/** The step the customer is actually allowed to see, whatever step was requested or saved. */
-export function effectiveStep(
-  requested: 1 | 2 | 3,
-  o: { access: Access; previewAllowed: boolean; mobileOk: boolean; addressOk: boolean }
-): 1 | 2 | 3 {
-  if (!isFlowOpen(o.access, o.previewAllowed)) return 1;
-  if (requested >= 2 && !o.mobileOk) return 1;
-  if (requested === 3 && !o.addressOk) return 2;
-  return requested;
-}
-
 export type Address = {
   fullName: string;
   mobile: string;

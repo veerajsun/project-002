@@ -1,4 +1,4 @@
-// All product database access lives here (not in pages or components).
+
 import { query, type Queryable } from "./db";
 import type { PricedProduct } from "./pricing";
 
@@ -17,6 +17,11 @@ type ProductRow = {
   mrp_paise: number;
 };
 
+type ProductImageRow = {
+  product_id: string;
+  image_url: string;
+};
+
 const defaultDb: Queryable = { query };
 
 export function toPriced(row: ProductRow): PricedProduct {
@@ -30,39 +35,76 @@ export function toPriced(row: ProductRow): PricedProduct {
   };
 }
 
-/** Every product shown in the shop (including ones temporarily out of stock), with photos. */
-export async function listActiveProducts(db: Queryable = defaultDb): Promise<Product[]> {
+/**
+ * Returns all active products, including unavailable products,
+ * together with their images.
+ */
+export async function listActiveProducts(
+  db: Queryable = defaultDb
+): Promise<Product[]> {
   const result = await db.query<
-    ProductRow & { is_available: boolean; sort_order: number; images: string[] }
+    ProductRow & {
+      is_available: number;
+      sort_order: number;
+    }
   >(
-    `SELECT p.id, p.slug, p.name, p.pack_grams, p.price_paise, p.mrp_paise,
-            p.is_available, p.sort_order,
-            COALESCE(array_agg(i.path ORDER BY i.sort_order) FILTER (WHERE i.path IS NOT NULL), ARRAY[]::text[]) AS images
-       FROM products p
-       LEFT JOIN product_images i ON i.product_id = p.id
-      WHERE p.status = 'ACTIVE'
-      GROUP BY p.id
-      ORDER BY p.sort_order, p.name`
+    `SELECT
+       id, slug, name, pack_grams, price_paise, mrp_paise,
+       is_available, sort_order
+     FROM products
+     ORDER BY sort_order, name`
   );
+
+  if (result.rows.length === 0) return [];
+
+  const productIds = result.rows.map((row) => row.id);
+  const placeholders = productIds.map(() => "?").join(", ");
+
+  const imageResult = await db.query<ProductImageRow>(
+    `SELECT product_id, image_url
+       FROM product_images
+      WHERE product_id IN (${placeholders})
+      ORDER BY sort_order`,
+    productIds
+  );
+
+  const imagesByProduct = new Map<string, string[]>();
+
+  for (const image of imageResult.rows) {
+    const images = imagesByProduct.get(image.product_id) ?? [];
+    images.push(image.image_url);
+    imagesByProduct.set(image.product_id, images);
+  }
+
   return result.rows.map((row) => ({
     ...toPriced(row),
-    isAvailable: row.is_available,
+    isAvailable: row.is_available === 1,
     sortOrder: row.sort_order,
-    images: row.images ?? [],
+    images: imagesByProduct.get(row.id) ?? [],
   }));
 }
 
-/** Only products that can be bought right now. These rows are the TRUSTED source of prices. */
+/**
+ * Returns only products that can currently be purchased.
+ * Prices always come from the database, never from the browser.
+ */
 export async function getPurchasableProductsBySlugs(
   slugs: string[],
   db: Queryable = defaultDb
 ): Promise<PricedProduct[]> {
   if (slugs.length === 0) return [];
+
+  const uniqueSlugs = [...new Set(slugs)];
+  const placeholders = uniqueSlugs.map(() => "?").join(", ");
+
   const result = await db.query<ProductRow>(
-    `SELECT id, slug, name, pack_grams, price_paise, mrp_paise
-       FROM products
-      WHERE slug = ANY($1::text[]) AND status = 'ACTIVE' AND is_available = true`,
-    [slugs]
+    `SELECT
+       id, slug, name, pack_grams, price_paise, mrp_paise
+     FROM products
+     WHERE slug IN (${placeholders})
+       AND is_available = 1`,
+    uniqueSlugs
   );
+
   return result.rows.map(toPriced);
 }
