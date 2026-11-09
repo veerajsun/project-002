@@ -11,6 +11,7 @@ import {
 } from "@/server/http";
 import { OrderError, placeOrder } from "@/server/orders";
 import { QuoteError } from "@/server/pricing";
+import { triggerBackgroundSync } from "@/server/sheet-sync-worker";
 import { parseOrderRequest } from "@/server/validation";
 
 export const runtime = "nodejs";
@@ -35,6 +36,15 @@ export const POST = withErrorHandling("orders:create", async (request) => {
 
   try {
     const created = await placeOrder(parsed.value);
+
+    // Non-blocking trigger: attempt immediate background sync without waiting or failing
+    if (!created.replayed) {
+      try {
+        triggerBackgroundSync();
+      } catch {
+        // Safe: background trigger errors never affect successful order response
+      }
+    }
 
     return json(
       {

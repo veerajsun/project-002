@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
+    "googleapis": "^189.0.0",
     "material-symbols": "latest",
     "next": "^15.5.0",
     "pg": "^8.23.1",
