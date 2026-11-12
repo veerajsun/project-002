@@ -92,15 +92,17 @@ export default function StepReview({
         );
       }
 
+      const orderInfo = (data?.order ?? data) as OrderResponse;
+
       if (
-        !data ||
-        typeof data.orderNumber !== "string" ||
-        data.paymentMethod !== "COD"
+        !orderInfo ||
+        typeof orderInfo.orderNumber !== "string" ||
+        orderInfo.paymentMethod !== "COD"
       ) {
         throw new Error("The server returned an invalid order response.");
       }
 
-      setOrder(data as OrderResponse);
+      setOrder(orderInfo);
 
       // Empty the cart only after the server confirms order creation.
       clearCart();

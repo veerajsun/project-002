@@ -5,21 +5,25 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "start:custom": "node server.js",
+    "db:migrate": "node scripts/db-migrate.mjs",
+    "db:seed": "node scripts/db-seed.mjs",
+    "db:selftest": "node scripts/db-selftest.mjs",
+    "sync:sheets": "node scripts/sync-sheets-outbox.mjs",
+    "test": "node scripts/test-phase2.mjs && node scripts/test-phase3.mjs && node scripts/test-phase4.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
     "googleapis": "^189.0.0",
     "material-symbols": "latest",
     "next": "^15.5.0",
-    "pg": "^8.23.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^20",
-    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.20",

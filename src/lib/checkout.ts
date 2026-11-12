@@ -93,13 +93,6 @@ export function validateMobile(value: string): string | null {
   return null;
 }
 
-/** OTP format only. This does NOT check the code against anything. */
-export function validateOtpFormat(value: string): string | null {
-  if (!value) return "Enter the 6-digit code.";
-  if (!/^\d{6}$/.test(value)) return "The code must be exactly 6 digits.";
-  return null;
-}
-
 /** Indian PIN code: 6 digits, first digit 1-9. */
 export function validatePin(value: string): string | null {
   if (!value) return "Enter your 6-digit PIN code.";

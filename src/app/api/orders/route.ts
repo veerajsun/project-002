@@ -48,6 +48,11 @@ export const POST = withErrorHandling("orders:create", async (request) => {
 
     return json(
       {
+        orderId: created.orderId,
+        orderNumber: created.orderNumber,
+        status: "NEW",
+        paymentMethod: PAYMENT_METHOD,
+        totalPaise: created.totalPaise,
         order: {
           orderId: created.orderId,
           orderNumber: created.orderNumber,

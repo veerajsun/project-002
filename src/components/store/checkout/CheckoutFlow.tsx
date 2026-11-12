@@ -24,7 +24,7 @@ import StepAddress from "./StepAddress";
 import StepReview from "./StepReview";
 
 const STEPS = [
-  { n: 1, title: "Mobile verification" },
+  { n: 1, title: "Contact details" },
   { n: 2, title: "Delivery address" },
   { n: 3, title: "Order review" },
 ] as const;
