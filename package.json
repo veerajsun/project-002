@@ -1,3 +1,4 @@
+
 {
   "name": "sabaland",
   "version": "0.1.0",
@@ -9,6 +10,7 @@
     "start:custom": "node server.js",
     "db:migrate": "node scripts/db-migrate.mjs",
     "db:seed": "node scripts/db-seed.mjs",
+    "check:npm-path": "node scripts/check-npm-path.mjs",
     "db:selftest": "node scripts/db-selftest.mjs",
     "sync:sheets": "node scripts/sync-sheets-outbox.mjs",
     "test": "node scripts/test-phase2.mjs && node scripts/test-phase3.mjs && node scripts/test-phase4.mjs"
@@ -17,9 +19,10 @@
     "better-sqlite3": "^13.0.3",
     "googleapis": "^189.0.0",
     "material-symbols": "latest",
-    "next": "^15.5.0",
+    "next": "^15.5.29",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "typescript": "^5"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
@@ -28,8 +31,7 @@
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.17",
-    "typescript": "^5"
+    "tailwindcss": "^3.4.17"
   },
   "allowScripts": {
     "better-sqlite3@13.0.3": true

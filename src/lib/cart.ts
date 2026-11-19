@@ -115,6 +115,25 @@ export function setQuantity(slug: string, quantity: number): number {
   return qty;
 }
 
+/**
+ * Prepares the cart for immediate checkout of the specified product.
+ * If the product is already in the cart, updates its quantity to `quantity`.
+ * If it is not present, adds it with `quantity`.
+ * Guarantees no duplicate cart entries for the product.
+ * Returns the final quantity in the cart (0 if the slug is unknown).
+ */
+export function buyNow(slug: string, quantity: number): number {
+  load();
+  if (!getProduct(slug)) return 0;
+  const qty = clampQty(quantity);
+  const existing = lines.find((l) => l.slug === slug);
+  const next = existing
+    ? lines.map((l) => (l.slug === slug ? { ...l, quantity: qty } : l))
+    : [...lines, { slug, quantity: qty }];
+  save(next);
+  return qty;
+}
+
 /** Removes a product from the cart. */
 export function removeFromCart(slug: string): void {
   load();

@@ -1,7 +1,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const root = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -59,7 +59,9 @@ export function getSqliteDbPath() {
 export function describeTarget() {
   const dbPath = getSqliteDbPath();
 
-  if (dbPath === ":memory:") return "SQLite in-memory database";
+  if (dbPath === ":memory:") {
+    return "SQLite in-memory database";
+  }
 
   return `SQLite database: ${path.basename(dbPath)}`;
 }
@@ -90,11 +92,47 @@ export async function connect() {
 }
 
 /**
+ * Loads TypeScript from the local project installation
+ * or from the HostKarle CloudLinux Node.js virtual environment.
+ */
+async function loadTypeScript() {
+  try {
+    const mod = await import("typescript");
+    return mod.default ?? mod;
+  } catch (localError) {
+    const home = process.env.HOME || path.dirname(root);
+    const nodeMajor = process.versions.node.split(".")[0];
+
+    const globalTsPath = path.join(
+      home,
+      "nodevenv",
+      path.basename(root),
+      nodeMajor,
+      "lib",
+      "node_modules",
+      "typescript",
+      "lib",
+      "typescript.js"
+    );
+
+    if (!fs.existsSync(globalTsPath)) {
+      throw new Error(
+        `TypeScript not found locally or at ${globalTsPath}. ` +
+        `Original error: ${localError.message}`
+      );
+    }
+
+    const mod = await import(pathToFileURL(globalTsPath).href);
+    return mod.default ?? mod;
+  }
+}
+
+/**
  * Transpiles TypeScript files into a temporary ESM folder
  * so Node scripts can import the actual application code.
  */
 export async function transpile(files, folderName = "db-tools") {
-  const ts = await import("typescript");
+  const ts = await loadTypeScript();
 
   const outputDir = path.join(
     root,
@@ -106,11 +144,11 @@ export async function transpile(files, folderName = "db-tools") {
   fs.mkdirSync(outputDir, { recursive: true });
 
   const compilerOptions = {
-    target: ts.default.ScriptTarget.ES2022,
-    module: ts.default.ModuleKind.ES2022,
-    moduleResolution: ts.default.ModuleResolutionKind.Bundler,
+    target: ts.ScriptTarget.ES2022,
+    module: ts.ModuleKind.ES2022,
+    moduleResolution: ts.ModuleResolutionKind.Bundler,
     esModuleInterop: true,
-    skipLibCheck: true,
+    skipLibCheck: true
   };
 
   const written = [];
@@ -119,22 +157,22 @@ export async function transpile(files, folderName = "db-tools") {
     const absoluteFile = path.join(root, relativeFile);
     const source = fs.readFileSync(absoluteFile, "utf8");
 
-    const result = ts.default.transpileModule(source, {
+    const result = ts.transpileModule(source, {
       compilerOptions,
       fileName: absoluteFile,
-      reportDiagnostics: true,
+      reportDiagnostics: true
     });
 
     const errors = (result.diagnostics ?? []).filter(
       (diagnostic) =>
-        diagnostic.category === ts.default.DiagnosticCategory.Error
+        diagnostic.category === ts.DiagnosticCategory.Error
     );
 
     if (errors.length) {
       throw new Error(
         errors
           .map((diagnostic) =>
-            ts.default.flattenDiagnosticMessageText(
+            ts.flattenDiagnosticMessageText(
               diagnostic.messageText,
               "\n"
             )
@@ -143,8 +181,10 @@ export async function transpile(files, folderName = "db-tools") {
       );
     }
 
-    const outputName =
-      path.basename(relativeFile).replace(/\.tsx?$/, ".mjs");
+    const outputName = path.basename(relativeFile).replace(
+      /\.tsx?$/,
+      ".mjs"
+    );
 
     const outputPath = path.join(outputDir, outputName);
 

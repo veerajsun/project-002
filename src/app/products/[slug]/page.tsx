@@ -5,8 +5,7 @@ import StoreShell from "@/components/store/StoreShell";
 import ProductCard, { packLabel, variantOf } from "@/components/store/ProductCard";
 import ProductGallery from "@/components/store/product/ProductGallery";
 import AddToCart from "@/components/store/product/AddToCart";
-import HowToUse from "@/components/store/home/HowToUse";
-import DeliverySection from "@/components/store/home/DeliverySection";
+import ProductBilingualInfo from "@/components/store/product/ProductBilingualInfo";
 import { products, getProduct, shortName, discountPercent } from "@/data/products";
 import { formatINR } from "@/lib/format";
 
@@ -39,16 +38,6 @@ export default async function ProductPage({ params }: PageProps) {
   const discount = discountPercent(product);
   const saving = product.mrp - product.price;
   const others = products.filter((p) => p.slug !== product.slug);
-
-  const facts: { label: string; value: string }[] = [
-    { label: "Product", value: product.name },
-    { label: "Pack size", value: packLabel(product.grams) },
-    { label: "Price", value: formatINR(product.price, 2) },
-    { label: "Regular price (MRP)", value: formatINR(product.mrp, 2) },
-    { label: "You save", value: `${formatINR(saving, 2)} (${discount}% off)` },
-    { label: "Shipping", value: "Free across India" },
-    { label: "Payment", value: "Cash on Delivery only" },
-  ];
 
   return (
     <StoreShell>
@@ -154,7 +143,7 @@ export default async function ProductPage({ params }: PageProps) {
                       Selected: {packLabel(product.grams)}
                     </span>
                   </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                     {products.map((p) => {
                       const current = p.slug === product.slug;
                       return (
@@ -162,30 +151,39 @@ export default async function ProductPage({ params }: PageProps) {
                           key={p.slug}
                           href={`/products/${p.slug}`}
                           aria-current={current ? "page" : undefined}
-                          className={`rounded-lg border p-3.5 transition-colors ${
+                          className={`relative flex flex-col justify-between rounded-lg border p-3 transition-all sm:p-3.5 ${
                             current
-                              ? "border-honey-500 bg-honey-50/40 ring-2 ring-honey-500/30"
+                              ? "border-honey-500 bg-honey-50/50 shadow-sm ring-2 ring-honey-500/30"
                               : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
                           }`}
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-semibold text-charcoal-900">
-                              {packLabel(p.grams)}
-                            </span>
-                            <span
-                              className={`h-3.5 w-3.5 rounded-full border ${
-                                current ? "border-honey-500 bg-honey-500" : "border-gray-300 bg-white"
-                              }`}
-                            />
+                          <div>
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="text-xs sm:text-sm font-bold text-charcoal-900">
+                                {packLabel(p.grams)}
+                              </span>
+                              <span
+                                className={`h-3.5 w-3.5 shrink-0 rounded-full border ${
+                                  current ? "border-honey-500 bg-honey-500" : "border-gray-300 bg-white"
+                                }`}
+                              />
+                            </div>
+                            <div className="mt-0.5 truncate text-[11px] sm:text-xs text-charcoal-500">
+                              Khalta{variantOf(p.name) ? ` · ${variantOf(p.name)}` : ""}
+                            </div>
                           </div>
-                          <div className="mt-1 text-xs text-charcoal-500">
-                            Khalta{variantOf(p.name) ? ` · ${variantOf(p.name)}` : ""}
-                          </div>
-                          <div className="mt-2 text-sm font-semibold text-charcoal-900">
-                            {formatINR(p.price)}
-                          </div>
-                          <div className="mt-0.5 text-[10px] font-semibold uppercase text-honey-700">
-                            Save {formatINR(p.mrp - p.price)}
+                          <div className="mt-2.5 pt-1.5 border-t border-gray-100/90">
+                            <div className="flex flex-wrap items-baseline gap-1.5">
+                              <span className="text-sm sm:text-base font-bold text-charcoal-900">
+                                {formatINR(p.price)}
+                              </span>
+                              <span className="text-[10px] sm:text-xs text-charcoal-400 line-through">
+                                {formatINR(p.mrp)}
+                              </span>
+                            </div>
+                            <div className="mt-0.5 text-[10px] sm:text-[11px] font-semibold uppercase text-honey-700">
+                              Save {formatINR(p.mrp - p.price)}
+                            </div>
                           </div>
                         </Link>
                       );
@@ -236,44 +234,8 @@ export default async function ProductPage({ params }: PageProps) {
           </div>
         </section>
 
-        {/* Product details */}
-        <section className="w-full border-y border-gray-200/80 bg-gray-50 py-16">
-          <div className="mx-auto grid max-w-store grid-cols-1 gap-10 px-6 lg:grid-cols-12 lg:gap-14 lg:px-12">
-            <div className="space-y-4 lg:col-span-7">
-              <span className="text-xs font-bold uppercase tracking-widest text-honey-600">
-                Product details
-              </span>
-              <h2 className="font-serif text-3xl text-charcoal-900 sm:text-4xl">About this honey</h2>
-              <p className="text-[15px] leading-relaxed text-charcoal-600">
-                Khalta is a natural wellness formula crafted with traditional herbs
-                and essential micronutrients.
-              </p>
-              <p className="text-[15px] leading-relaxed text-charcoal-600">
-                Sabland brings Yemeni honey from the mountains and valleys of
-                Yemen to homes across India. Every order is shipped with 100%
-                discreet packaging.
-              </p>
-            </div>
-
-            <div className="lg:col-span-5">
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h3 className="font-serif text-xl text-charcoal-900">At a glance</h3>
-                <dl className="mt-4 divide-y divide-gray-100 text-sm">
-                  {facts.map((f) => (
-                    <div key={f.label} className="flex flex-col gap-0.5 py-2.5 sm:flex-row sm:justify-between sm:gap-4">
-                      <dt className="text-charcoal-500">{f.label}</dt>
-                      <dd className="font-semibold text-charcoal-900 sm:text-right">{f.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Existing homepage sections, reused as they are */}
-        <HowToUse />
-        <DeliverySection />
+        {/* Bilingual Hindi & English Product Information */}
+        <ProductBilingualInfo />
 
         {/* Other products */}
         <section className="w-full bg-white py-16 lg:py-20">
